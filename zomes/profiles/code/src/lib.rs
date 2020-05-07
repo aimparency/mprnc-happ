@@ -15,9 +15,12 @@ use hdk::{
 	},
 	holochain_persistence_api::{
 		cas::content::Address,
+        hash::HashString,
 	},
 	holochain_core_types::{
-		entry::Entry,
+		entry::{
+            Entry,
+        },
 		dna::entry_types::Sharing,
 	},
 	holochain_json_api::{
@@ -25,6 +28,8 @@ use hdk::{
 		json::JsonString,
 	}
 };
+
+use std::convert::TryFrom; 
 
 // see https://developer.holochain.org/api/0.0.47-alpha1/hdk/ for info on using the hdk library
 
@@ -36,6 +41,13 @@ pub struct Profile{
     name: String,
 	creator: Address
 }
+
+#[derive(Serialize, Deserialize, Debug, DefaultJson,Clone)]
+pub struct AddressAndEntry{ //TODO make this generic, not only for Profile
+    entry: Profile, 
+    address: HashString
+}
+
 
 pub fn handle_get_my_agent_address() -> ZomeApiResult<Address> {
 	Ok(hdk::AGENT_ADDRESS.clone())
@@ -57,12 +69,48 @@ pub fn handle_create_profile(name: String) -> ZomeApiResult<Address> {
     Ok(address)
 }
 
-pub fn handle_get_my_profiles() -> ZomeApiResult<Vec<Profile>> {
-	hdk::utils::get_links_and_load_type(
+pub fn handle_get_my_profiles() -> ZomeApiResult<Vec<AddressAndEntry>> {
+    Ok( hdk::get_links(
 		&hdk::AGENT_ADDRESS.clone(), 
 		LinkMatch::Exactly("agent_created_profile"), 
 		LinkMatch::Any
-	)
+	)?.addresses().iter()
+        .filter_map::<AddressAndEntry,_>(|address| {
+            match hdk::api::get_entry(&address) {
+                Ok(option) => {
+                    return match option {
+                        Some(entry) => {
+                            match entry {
+                                Entry::App(_, entry_value) => {
+                                    return match Profile::try_from(entry_value.to_owned()) {
+                                        Ok(profile) => Some(
+                                            AddressAndEntry {
+                                                address: address.clone(),
+                                                entry: profile
+                                            }
+                                        ), 
+                                        Err(_) => None
+                                    }
+                                },
+                                _ => None,
+                            }
+                        },
+                        None => None,
+                    }
+                }, 
+                Err(_) => None,
+            }
+        })
+        .collect::<Vec<AddressAndEntry>>()
+    )
+}
+
+pub fn handle_get_my_profiles_without_addresses() -> ZomeApiResult<Vec<Profile>> {
+    hdk::utils::get_links_and_load_type(
+        &hdk::AGENT_ADDRESS.clone(), 
+        LinkMatch::Exactly("agent_created_profile"),
+        LinkMatch::Any
+    )
 }
 
 define_zome! {
@@ -111,7 +159,7 @@ define_zome! {
         }
 		get_my_profiles: {
 			inputs: | |, 
-			outputs: |result: ZomeApiResult<Vec<Profile>>|, 
+			outputs: |result: ZomeApiResult<Vec<AddressAndEntry>>|, 
 			handler: handle_get_my_profiles
 		}
     ]
