@@ -30,22 +30,68 @@ use hdk::holochain_json_api::{
 };
 
 
+#[derive(Serialize, Deserialize, Debug, DefaultJson, Clone)]
+pub enum Effort {
+    Minutes(u64), 
+    Hours(u64), 
+    Days(u64), 
+    Weeks(u64), 
+    Months(u64), 
+    Years(u64),
+}
+
+impl ToString for Effort {
+    fn to_string(&self) -> String {
+        match self {
+            Effort::Minutes(m) => m.to_string() + "min",
+            Effort::Hours(h) => h.to_string() + "h", 
+            Effort::Days(d) => d.to_string() + "d", 
+            Effort::Weeks(w) => w.to_string() + "w", 
+            Effort::Months(m) => m.to_string() + "m",
+            Effort::Years(y) => y.to_string() + "y"
+        }
+    }
+}
+
+impl Effort {
+    fn from_string(mut s: String) -> Effort {
+        s.retain(|c| !c.is_whitespace()); 
+        let len = s.chars().count();
+        let cutoff = | n | {
+            let number_str: String = s.chars().take(len - n).collect();
+            number_str.parse::<u64>().unwrap()
+        };
+        match s.chars().last().unwrap() {
+            'n' => Effort::Minutes(cutoff(3)), 
+            'h' => Effort::Hours(cutoff(1)), 
+            'd' => Effort::Days(cutoff(1)), 
+            'w' => Effort::Weeks(cutoff(1)), 
+            'm' => Effort::Months(cutoff(1)), 
+            'y' => Effort::Years(cutoff(1)),
+            _ => Effort::Days(1u64) // default
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, DefaultJson,Clone)]
 pub struct Aim {
     title: String,
 	description: String, 
+    effort: Effort, 
 	timestamp_ms: i64,
 }
 
 pub fn handle_create_aim(
 	title: String, 
 	description: String, 
+    effort_str: String, 
 	profile: HashString, 
 	timestamp_ms: i64
 ) -> ZomeApiResult<Address> {
 	let aim = Aim {
 		title,
 		description, 
+        effort: Effort::from_string(effort_str), 
 		timestamp_ms, 
 	};
     let entry = Entry::App("aim".into(), aim.into());
@@ -107,7 +153,7 @@ define_zome! {
 
     functions: [
         create_aim: {
-            inputs: |title:String, description:String, profile:HashString, timestamp_ms: i64|,
+            inputs: |title:String, description:String, effort_str: String, profile:HashString, timestamp_ms: i64|,
             outputs: |result: ZomeApiResult<Address>|,
             handler: handle_create_aim
         }
