@@ -11,6 +11,9 @@ serde_derive = "1.0"
 hdk = "=0.0.47-alpha1"
 holochain_wasm_utils = "=0.0.47-alpha1"
 holochain_json_derive = "0.0"
+futures = "=0.3.2"
+futures-util = "=0.3.2"
+futures-macro = "=0.3.2"
 
 [lib]
 path = "src/lib.rs"
