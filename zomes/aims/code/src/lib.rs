@@ -81,6 +81,13 @@ pub struct Aim {
 	timestamp_ms: i64,
 }
 
+#[derive(Serialize, Deserialize, Debug, DefaultJson, Clone)]
+pub struct Connection {
+    contributing: Address, 
+    receiving: Address,
+    contribution: u32
+}
+
 pub fn handle_create_aim(
 	title: String, 
 	description: String, 
