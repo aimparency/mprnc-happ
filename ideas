@@ -3,7 +3,16 @@
 		- Bewerbung: "Mein Ziel trägt zu deinem bei" 
 		- Accept: Signatur
 		- Decline: keine Signatur / ignore
-	- Die layout validation für einen Link erfordert dann so eine Signature (von beiden?) 
+	- Die Layout Validation für einen Link erfordert dann so eine Signature (von beiden?) 
 	- Löschen kann jeder (die Historie bleibt eh - safe) 
 	
-- Labels für aims
+- Labels für Aims
+
+- Colors für Aims => wichtig zum Beispiel beim durchklicken
+
+- Durchklicken: 
+	- Ein Klick auf ein Aim zeigt alle unteraims davon
+
+- Dann, links
+	- Ein quadratischer Button oben: Navigation zurück
+	- Ein Balken-Button darunter (gleiche Breite): Zeigt alle dependent goals
