@@ -29,6 +29,8 @@ use hdk::holochain_json_api::{
     json::JsonString,
 };
 
+use std::convert::TryFrom;
+
 
 #[derive(Serialize, Deserialize, Debug, DefaultJson, Clone)]
 pub enum Effort {
@@ -84,7 +86,7 @@ pub struct Aim {
 #[derive(Serialize, Deserialize, Debug, DefaultJson, Clone)]
 pub struct Connection {
     contributing: Address, 
-    receiving: Address,
+    benefited: Address,
     contribution: u32
 }
 
@@ -112,6 +114,27 @@ pub fn handle_create_aim(
     Ok(address)
 }
 
+pub fn handle_create_connection(
+    contributing_aim_address: Address, 
+    benefited_aim_address: Address, 
+    contribution: u32,
+) -> ZomeApiResult<()> {
+    let connection = Connection {
+        contributing: contributing_aim_address.clone(), 
+        benefited: benefited_aim_address.clone(), 
+        contribution
+    }; 
+    let entry = Entry::App("connection".into(), connection.into()); 
+    let connection_address = hdk::commit_entry(&entry)?;
+
+    hdk::link_entries(&contributing_aim_address, &connection_address, "contributes_to", "")?;
+    hdk::link_entries(&connection_address, &benefited_aim_address, "contributes_to", "")?;
+    hdk::link_entries(&benefited_aim_address, &connection_address, "benefits_from", "")?;
+    hdk::link_entries(&connection_address, &benefited_aim_address, "benefits_from", "")?;
+
+    Ok(())
+}
+
 pub fn handle_get_aims(creator: Address) -> ZomeApiResult<Vec<Aim>> {
 	hdk::utils::get_links_and_load_type(
 		&creator, 
@@ -120,7 +143,85 @@ pub fn handle_get_aims(creator: Address) -> ZomeApiResult<Vec<Aim>> {
 	)
 }
 
-fn definition() -> ValidatingEntryType {
+#[derive(Serialize, Deserialize, Debug, DefaultJson, Clone)]
+pub struct ConnectedAim{
+    aim: Aim, 
+    aim_address: Address, 
+    connection: Connection, 
+    connection_address: Address, 
+}
+
+pub fn handle_get_benefited_aims(
+    contributing_aim_address: Address, 
+) -> ZomeApiResult<Vec<ConnectedAim>> {
+    get_connected_aims(contributing_aim_address, "contributes_to")
+}
+
+pub fn handle_get_contributing_aims(
+    benefited_aim_address: Address, 
+) -> ZomeApiResult<Vec<ConnectedAim>> {
+    get_connected_aims(benefited_aim_address, "benefited_from")
+}
+
+pub fn get_connected_aims (
+    benefited_aim_address: Address, 
+    relation: &str
+) -> ZomeApiResult<Vec<ConnectedAim>> {
+    Ok( hdk::get_links(
+        &benefited_aim_address, 
+        LinkMatch::Exactly(relation), 
+        LinkMatch::Any
+    )?.addresses().iter()
+        .filter_map(|connection_address| match hdk::api::get_entry(connection_address) {
+            Ok(connection_option) => match connection_option {
+                Some(connection_entry) => match match hdk::get_links(
+                        connection_address,
+                        LinkMatch::Exactly(relation),
+                        LinkMatch::Any
+                    ) {
+                    Ok(result) => result.addresses().iter()
+                        .map(|aim_address| match hdk::api::get_entry(aim_address) {
+                            Ok(aim_option) => match aim_option {
+                                Some(aim_entry) => match connection_entry.clone(){
+                                    Entry::App(_, connection_value) => match aim_entry {
+                                        Entry::App(_, aim_value) => 
+                                            match Connection::try_from(connection_value.to_owned()) {
+                                                Ok(connection) => 
+                                                    match Aim::try_from(aim_value.to_owned()) {
+                                                        Ok(aim) => Some(ConnectedAim {
+                                                            aim, 
+                                                            aim_address: aim_address.clone().into(), 
+                                                            connection, 
+                                                            connection_address: connection_address.clone().into()
+                                                        }), 
+                                                        Err(_) => None
+                                                    }
+                                                Err(_) => None
+                                            },
+                                        
+                                        _ => None
+                                    }, 
+                                    _ => None
+                                }, 
+                                None => None
+                            },
+                            Err(_) => None
+                        })
+                        .next(),
+                    Err(_) => None
+                } {
+                    Some(connected_aim) => connected_aim, 
+                    None => None
+                },
+                None => None
+            },
+            Err(_) => None
+        })
+        .collect::<Vec<ConnectedAim>>() 
+    )
+}
+
+fn aim_entry_definition() -> ValidatingEntryType {
     entry!(
         name: "aim",
         description: "this is an aim of some agent",
@@ -147,9 +248,66 @@ fn definition() -> ValidatingEntryType {
     )
 }
 
+fn connection_entry_definition() -> ValidatingEntryType {
+    entry!(
+        name: "connection", 
+        description: "this is a connection between aims which expresses contribution of one aim to another", 
+        sharing: Sharing::Public,  
+        validation_package: || {
+            hdk::ValidationPackageDefinition::Entry
+        },
+        validation: | _validation_data: hdk::EntryValidationData<Connection>| {
+            Ok(())
+        },
+		links: [
+			from!(
+				"aim", 
+				link_type: "contributes_to", 
+				validation_package:  || {
+					hdk::ValidationPackageDefinition::Entry
+				},
+				validation: | _validation_data: hdk::LinkValidationData | {
+					Ok(())
+				}
+			), 
+			from!(
+				"aim", 
+				link_type: "benefits_from", 
+				validation_package:  || {
+					hdk::ValidationPackageDefinition::Entry
+				},
+				validation: | _validation_data: hdk::LinkValidationData | {
+					Ok(())
+				}
+			), 
+			to!(
+				"aim", 
+				link_type: "contributes_to", 
+				validation_package:  || {
+					hdk::ValidationPackageDefinition::Entry
+				},
+				validation: | _validation_data: hdk::LinkValidationData | {
+					Ok(())
+				}
+			), 
+			to!(
+				"aim", 
+				link_type: "benefits_from", 
+				validation_package:  || {
+					hdk::ValidationPackageDefinition::Entry
+				},
+				validation: | _validation_data: hdk::LinkValidationData | {
+					Ok(())
+				}
+			)
+		]
+    )
+}
+
 define_zome! {
     entries: [
-       definition()
+       aim_entry_definition(), 
+       connection_entry_definition()
     ]
 
     init: || { Ok(()) }
@@ -168,6 +326,21 @@ define_zome! {
             inputs: |profile: Address|,
             outputs: |result: ZomeApiResult<Vec<Aim>>|,
             handler: handle_get_aims 
+        }
+        create_connection: {
+            inputs: |contributing_aim_address: Address, benefited_aim_address: Address, contribution: u32 |,
+            outputs: |result: ZomeApiResult<()>|,
+            handler: handle_create_connection 
+        }
+        get_contributing_aims: {
+            inputs: |benefited_aim_address: Address|,
+            outputs: |result: ZomeApiResult<Vec<ConnectedAim>>|, 
+            handler: handle_get_contributing_aims
+        }
+        get_benefited_aims: {
+            inputs: |contributing_aim_address: Address|,
+            outputs: |result: ZomeApiResult<Vec<ConnectedAim>>|, 
+            handler: handle_get_benefited_aims
         }
     ]
 
