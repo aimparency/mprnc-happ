@@ -81,6 +81,7 @@ pub struct Aim {
 	description: String, 
     effort: Effort, 
 	timestamp_ms: i64,
+    color: [char; 6],
 }
 
 #[derive(Serialize, Deserialize, Debug, DefaultJson, Clone)]
@@ -95,13 +96,15 @@ pub fn handle_create_aim(
 	description: String, 
     effort_str: String, 
 	profile: HashString, 
-	timestamp_ms: i64
+	timestamp_ms: i64,
+    color: [char; 6]
 ) -> ZomeApiResult<Address> {
 	let aim = Aim {
 		title,
 		description, 
         effort: Effort::from_string(effort_str), 
-		timestamp_ms, 
+		timestamp_ms,
+        color, 
 	};
     let entry = Entry::App("aim".into(), aim.into());
     let address = hdk::commit_entry(&entry)?;
@@ -318,7 +321,14 @@ define_zome! {
 
     functions: [
         create_aim: {
-            inputs: |title:String, description:String, effort_str: String, profile:HashString, timestamp_ms: i64|,
+            inputs: |
+                title:String, 
+                description:String, 
+                effort: String, 
+                profile:HashString, 
+                timestamp_ms: i64, 
+                color: [char; 6]
+            |,
             outputs: |result: ZomeApiResult<Address>|,
             handler: handle_create_aim
         }
