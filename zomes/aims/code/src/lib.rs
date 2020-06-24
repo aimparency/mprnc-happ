@@ -56,7 +56,7 @@ impl ToString for Effort {
 }
 
 impl Effort {
-    fn from_string(mut s: String) -> Effort {
+/*    fn from_string(mut s: String) -> Effort {
         s.retain(|c| !c.is_whitespace()); 
         let len = s.chars().count();
         let cutoff = | n | {
@@ -72,7 +72,7 @@ impl Effort {
             'y' => Effort::Years(cutoff(1)),
             _ => Effort::Days(1u64) // default
         }
-    }
+    }*/
 }
 
 #[derive(Serialize, Deserialize, Debug, DefaultJson,Clone)]
@@ -94,7 +94,7 @@ pub struct Connection {
 pub fn handle_create_aim(
 	title: String, 
 	description: String, 
-    effort_str: String, 
+    effort: Effort, 
 	profile: HashString, 
 	timestamp_ms: i64,
     color: [char; 6]
@@ -102,9 +102,9 @@ pub fn handle_create_aim(
 	let aim = Aim {
 		title,
 		description, 
-        effort: Effort::from_string(effort_str), 
-		timestamp_ms,
         color, 
+        effort, 
+		timestamp_ms, 
 	};
     let entry = Entry::App("aim".into(), aim.into());
     let address = hdk::commit_entry(&entry)?;
@@ -324,7 +324,7 @@ define_zome! {
             inputs: |
                 title:String, 
                 description:String, 
-                effort: String, 
+                effort: Effort, 
                 profile:HashString, 
                 timestamp_ms: i64, 
                 color: [char; 6]
