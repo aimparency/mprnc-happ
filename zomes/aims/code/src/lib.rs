@@ -451,7 +451,12 @@ define_zome! {
        connection_entry_definition()
     ]
 
-    init: || { Ok(()) }
+    init: || { 
+        match handle_create_root_aim() {
+            Ok(_) => Ok(()),
+            Err(error) => Err(format!("{}", error))
+        }
+    }
 
     validate_agent: |validation_data : EntryValidationData::<AgentId>| {
         Ok(())
