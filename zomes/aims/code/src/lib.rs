@@ -239,7 +239,7 @@ pub fn handle_get_agent_address() -> ZomeApiResult<Address> {
 pub fn handle_create_root_aim() -> ZomeApiResult<Address> {
     let aim = Aim {
         title: String::from("root aim"), 
-        description: String::from("this is the single root aim of this agent. Some algorithms will use these root aims as the main source of collective will: using these aims as the only entrance of value flow before calculating the importance of all goals"),
+        description: String::from("this is the single root aim of this agent. Some algorithms will use these root aims as the main source of collective will: using these aims as the only entrance of importance flow before calculating the absolute importance for each goal"),
         effort: Effort::Years(100), 
         timestamp_ms: 1594443995818, 
         color: ['5'; 6],
